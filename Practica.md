@@ -134,6 +134,155 @@ Para ver su correcto funcionamiento se añaden las siguientes líneas a /etc/ngi
     }
 ~~~
 
-> Para hacer las comprobaciones hay que instalar el paquete ftp.
+#### Configuración de SeLinux
+~~~
+[centos@salmorejo-3 html]$ sudo setsebool -P allow_ftpd_full_access=1
+~~~
+
+Y se reinicia el servicio de proftpd:
+~~~
+[centos@salmorejo-3 html]$ sudo systemctl restart proftpd.service
+~~~
+
 
 ##### Comprobación en local
+> Para hacer las comprobaciones hay que instalar el paquete ftp.
+~~~
+[centos@salmorejo-3 html]$ ftp localhost
+Connected to localhost (::1).
+220 FTP Server ready.
+Name (localhost:centos): user_paloma
+331 Password required for user_paloma
+Password:
+230 User user_paloma logged in
+Remote system type is UNIX.
+Using binary mode to transfer files.
+ftp> ls
+229 Entering Extended Passive Mode (|||32729|)
+150 Opening ASCII mode data connection for file list
+-rw-r--r--   1 user_paloma user_paloma        0 Dec 11 11:53 ficheroprueba.txt
+226 Transfer complete
+ftp> exit
+221 Goodbye.
+~~~
+
+#### Comprobación en remoto
+~~~
+paloma@coatlicue:~/DISCO2/CICLO II/Maquinas-claud/Hosting$ ftp ftp.paloma.gonzalonazareno.org
+Connected to salmorejo.paloma.gonzalonazareno.org.
+220 FTP Server ready.
+Name (ftp.paloma.gonzalonazareno.org:paloma): user_paloma
+331 Password required for user_paloma
+Password:
+230 User user_paloma logged in
+Remote system type is UNIX.
+Using binary mode to transfer files.
+ftp> ls
+200 PORT command successful
+150 Opening ASCII mode data connection for file list
+-rw-r--r--   1 user_paloma user_paloma        0 Dec 11 11:53 ficheroprueba.txt
+226 Transfer complete
+ftp> put pruebaEnCoatlicue.txt 
+local: pruebaEnCoatlicue.txt remote: pruebaEnCoatlicue.txt
+200 PORT command successful
+150 Opening BINARY mode data connection for pruebaEnCoatlicue.txt
+226 Transfer complete
+ftp> ls
+200 PORT command successful
+150 Opening ASCII mode data connection for file list
+-rw-r--r--   1 user_paloma user_paloma        0 Dec 11 11:53 ficheroprueba.txt
+-rw-r--r--   1 user_paloma user_paloma        0 Dec 16 11:10 pruebaEnCoatlicue.txt
+226 Transfer complete
+ftp> exit
+221 Goodbye.
+~~~
+
+### Base de datos
+#### Creación del usuario de la base de datos
+Desde la máquina servidora de la base de datos:
+~~~
+[centos@salmorejo ~]$ ssh ubuntu@tortilla 'sudo mysql -e "CREATE USER \"my_paloma\"@\"%\" IDENTIFIED BY \"my_paloma\";"'
+[centos@salmorejo ~]$ ssh ubuntu@tortilla 'sudo mysql -e "create database db_paloma"'
+[centos@salmorejo ~]$ ssh ubuntu@tortilla 'sudo mysql -e "GRANT ALL PRIVILEGES ON db_paloma.* TO \"my_paloma\"@\"%\";"'
+~~~
+
+#### phpmyadmin
+Instalar y descomprimir myphpadmin:
+~~~
+[centos@salmorejo ~]$ wget https://files.phpmyadmin.net/phpMyAdmin/4.9.2/phpMyAdmin-4.9.2-all-languages.zip
+[centos@salmorejo ~]$ unzip phpMyAdmin-4.9.2-all-languages.zip 
+Archive:  phpMyAdmin-4.9.2-all-languages.zip
+~~~
+
+Mover los ficheros:
+~~~
+[centos@salmorejo ~]$ sudo mv phpMyAdmin-4.9.2-all-languages /usr/share/phpmyadmin
+~~~
+
+Se cambia el propietario y los permisos del nuevo directorio:
+~~~
+[centos@salmorejo ~]$ sudo chown nginx:nginx -R /usr/share/nginx/html/phpmyadmin/
+[centos@salmorejo ~]$ sudo find /usr/share/nginx/html/phpmyadmin/ -type f -exec chmod 0644 {} \;
+[centos@salmorejo ~]$ sudo find /usr/share/nginx/html/phpmyadmin/ -type d -exec chmod 0755 {} \;
+[centos@salmorejo ~]$ sudo chcon -t httpd_sys_content_t /usr/share/nginx/html/phpmyadmin -R
+[centos@salmorejo ~]$ sudo chcon -t httpd_sys_content_t /usr/share/nginx/html/phpmyadmin/ -R
+[centos@salmorejo ~]$ sudo setsebool -P httpd_can_network_connect_db 1
+~~~
+
+Se crea el virtualhost de phpmyadmin:
+~~~
+server {
+    listen 80;
+    server_name  sql.paloma.gonzalonazareno.org;
+    rewrite ^ https://$server_name$request_uri permanent;
+}
+
+server {
+    listen 443 ssl;
+    server_name  sql.paloma.gonzalonazareno.org;
+    ssl on;
+    ssl_certificate /etc/pki/tls/certs/paloma.gonzalonazareno.org.crt;
+    ssl_certificate_key /etc/pki/tls/private/gonzalonazareno.pem;
+
+    root   /usr/share/nginx/html/phpmyadmin;
+    index index.php index.html index.htm;
+
+    location / {
+        try_files $uri $uri/ /index.php?$args;
+    }
+
+    location ~ \.php$ {
+        try_files $uri =404;
+        fastcgi_pass unix:/var/run/php-fpm/www.sock;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+}
+~~~
+
+Se reinicia nginx:
+~~~
+[centos@salmorejo html]$ sudo systemctl restart nginx
+[centos@salmorejo html]$ sudo systemctl restart php-fpm
+~~~
+
+A partir de aquí se configura la aplicación phpMyAdmin, a través del navegador, para realizar la conexión a nuestra base de datos que se aloja en el servidor tortilla. Se selecciona nuevo servidor:
+![phpmyadmin1](images/bimg.png)
+
+La siguiente pantalla es para la configuración donde se indica la dirección del servidor de MariaDB:
+![phpmyadmin2](images/cimg.png)
+
+Tras aplicar los cambios, aparece en la siguiente pantalla el servidor.
+![phpmyadmin3](images/dimg.png)
+
+Se pulsa el botón mostrar que redirige a una nueva pantalla con un script que se copiará en el fichero /usr/share/nginx/html/phpmyadmin/config.inc.php:
+![phpmyadmin4](images/eimg.png)
+
+Una vez copiado, ya se puede entrar en la aplicación a través del usuario y la contraseña creados anteriormente en la base de datos.
+![phpmyadmin4](images/fimg.png)
+
+![phpmyadmin5](images/gimg.png)
+
+
+
