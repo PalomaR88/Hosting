@@ -360,6 +360,12 @@ La instalación del CMS WordPress también está explicado en la Práctica Insta
 ![instalacionWP2](images/jimg.png)
 
 
+#### Script para automatizar
+Se crea un script que introduciendo dos parámetros, el nombre del usuario ftp y el dominio del usuario, automatice la creación y el borrado de usuarios.
+
+El script es el [siguiente](link).
+
+
 ### Configuración de usuarios guarados en LDAP
 Se descomanta la siguiente línea del fichero /etc/proftpd.conf:
 ~~~
