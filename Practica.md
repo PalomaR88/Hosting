@@ -285,4 +285,111 @@ Una vez copiado, ya se puede entrar en la aplicación a través del usuario y la
 ![phpmyadmin5](images/gimg.png)
 
 
+### Configuración de un CMS
+Se va a instalar y configurar Wordpress.
+
+#### Descarga y traspaso de ficheros
+Se descarga WordPress en la máquina anfitriona.
+~~~
+paloma@coatlicue:~/Descargas$ wget https://es.wordpress.org/latest-es_ES.zip
+~~~
+
+Se descomprime WordPress:
+~~~
+paloma@coatlicue:~/Descargas$ unzip latest-es_ES.zip 
+~~~
+
+Desde dentro del direcotrio que se ha descargado se envían los ficheros a la máquina servidor con ftp pero antes se borrarán todos los fichero que habían con aterioridad:
+~~~
+paloma@coatlicue:~/Descargas/wordpress$ ftp ftp.paloma.gonzalonazareno.org
+Connected to salmorejo.paloma.gonzalonazareno.org.
+220 FTP Server ready.
+Name (ftp.paloma.gonzalonazareno.org:paloma): user_paloma
+331 Password required for user_paloma
+Password:
+230 User user_paloma logged in
+Remote system type is UNIX.
+Using binary mode to transfer files.
+ftp> ls
+200 PORT command successful
+150 Opening ASCII mode data connection for file list
+-rw-r--r--   1 user_paloma user_paloma        0 Dec 11 11:53 ficheroprueba.txt
+-rw-r--r--   1 user_paloma user_paloma        0 Dec 16 11:10 pruebaEnCoatlicue.txt
+226 Transfer complete
+ftp> mdelete *
+mdelete pruebaEnCoatlicue.txt? 
+250 DELE command successful
+mdelete ficheroprueba.txt? 
+250 DELE command successful
+ftp> ls
+200 PORT command successful
+150 Opening ASCII mode data connection for file list
+226 Transfer complete
+~~~
+
+Se pasan los ficheros:
+~~~
+ftp> mput *
+~~~
+
+De esta forma se van a pasar todos los ficheros del directorio wordpress pero no los directorios que contienen. Para ello se necesita el sigueinte paquete:
+~~~
+paloma@coatlicue:~/Descargas/wordpress$ sudo apt install lftp
+~~~
+
+Y para pasar los directorios:
+~~~
+paloma@coatlicue:~/Descargas/wordpress$ lftp -u user_paloma ftp.paloma.gonzalonazareno.org
+Clave:                                          
+lftp user_paloma@ftp.paloma.gonzalonazareno.org:/> mirror -R wp-admin
+lftp user_paloma@ftp.paloma.gonzalonazareno.org:/> mirror -R wp-includes
+lftp user_paloma@ftp.paloma.gonzalonazareno.org:/> mirror -R wp-content
+~~~
+
+#### Instalación de Wordpress
+La instalación de wordpress se inicia a través del navegador. Se ha decidido crear dentro del directorio del usuario ftp un directorio llamado wordpress para que contenga todos los ficheros y directorios necesarios para este CMS. Por lo tanto, la url para acceder a wordpress será el dominio del usuario de ftp /wordpress.
+
+Es posible que para poder comenzar la instalación haya que otorgar una serie de permisos hacia la nueva ruta de wordpress como se explica en el siquiente [punto](https://github.com/PalomaR88/Instalacion_aplicaciones_web/blob/master/Practica-aplicaciones.md#configuraci%C3%B3n-de-selinux-para-wordpress) de la práctica [Instalación de aplicaciones web](https://github.com/PalomaR88/Instalacion_aplicaciones_web/blob/master/Practica-aplicaciones.md#configuraci%C3%B3n-de-selinux-para-wordpress).
+
+![instalacionWP](images/himg.png)
+
+La instalación del CMS WordPress también está explicado en la Práctica Instalación de aplicaciones web, en el punto [Instalación de WordPress en CentOS](https://github.com/PalomaR88/Instalacion_aplicaciones_web/blob/master/Practica-aplicaciones.md#instalaci%C3%B3n-de-wordpress-en-centos).
+
+![instalacionWP1](images/iimg.png)
+
+![instalacionWP2](images/jimg.png)
+
+
+### Configuración de usuarios guarados en LDAP
+Se descomanta la siguiente línea del fichero /etc/proftpd.conf:
+~~~
+LoadModule mod_ldap.c
+~~~
+
+Además, se añade la configuración de LDAP:
+~~~
+<IfModule mod_ldap.c>
+        LDAPServer croqueta-int.paloma.gonzalonazareno.org
+        LDAPDNInfo "cn=admin,dc=paloma,dc=gonzalonazareno,dc=org" "contraseña"
+        LDAPDoAuth on "ou=People,dc=paloma,dc=gonzalonazareno,dc=org"
+        AuthPAM on
+</IfModule>
+~~~
+
+Es necesaria la siguiente librería:
+~~~
+[centos@salmorejo ~]$ sudo dnf install libmemcached-1.0.18
+~~~
+
+El módulo se encuentra en un repositrio de gitHub. Para ello hay que descargarse el paquete git y clonar dicho repositorio. 
+[centos@salmorejo ~]$ sudo dnf install git
+
+
+
+    cp -f mod_ldap.c proftpd-version/contrib
+* cd proftpd-version
+* ./configure --with-modules=mod_ldap
+* make
+* make install
+
 
